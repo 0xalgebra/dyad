@@ -1,6 +1,5 @@
-import { sql } from "drizzle-orm";
+import { sql , relations } from "drizzle-orm";
 import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
-import { relations } from "drizzle-orm";
 
 export const prompts = sqliteTable("prompts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -48,6 +47,7 @@ export const apps = sqliteTable("apps", {
   isFavorite: integer("is_favorite", { mode: "boolean" })
     .notNull()
     .default(sql`0`),
+  isContractProject: integer("is_contract_project", { mode: "boolean" }).default(false),
 });
 
 export const chats = sqliteTable("chats", {

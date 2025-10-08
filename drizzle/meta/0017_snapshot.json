@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7298ef8b-13f8-4751-91e8-dd503903f512",
-  "prevId": "8c77d7f5-9f88-4186-8aff-8385e060e59f",
+  "id": "05c9447b-a34e-4465-a1e0-d23d0603f64c",
+  "prevId": "c0a49147-ac92-4046-afe8-42f20df9314b",
   "tables": {
     "apps": {
       "name": "apps",
@@ -67,6 +67,13 @@
         },
         "supabase_project_id": {
           "name": "supabase_project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "supabase_parent_project_id": {
+          "name": "supabase_parent_project_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -566,8 +573,22 @@
           "notNull": false,
           "autoincrement": false
         },
+        "source_commit_hash": {
+          "name": "source_commit_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "commit_hash": {
           "name": "commit_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "request_id": {
+          "name": "request_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

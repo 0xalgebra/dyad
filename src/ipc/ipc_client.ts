@@ -271,8 +271,8 @@ export class IpcClient {
     return IpcClient.instance;
   }
 
-  public async restartDyad(): Promise<void> {
-    await this.ipcRenderer.invoke("restart-dyad");
+  public async restartShinso(): Promise<void> {
+    await this.ipcRenderer.invoke("restart-shinso");
   }
 
   public async reloadEnvPath(): Promise<void> {
@@ -1326,5 +1326,32 @@ export class IpcClient {
 
   public cancelHelpChat(sessionId: string): void {
     this.ipcRenderer.invoke("help:chat:cancel", sessionId).catch(() => {});
+  }
+
+  // Sui Move compilation and deployment
+  public async suiCompile(appPath: string): Promise<{
+    success: boolean;
+    output: string;
+    error?: string;
+  }> {
+    return this.ipcRenderer.invoke("sui-compile", { appPath });
+  }
+
+  public async suiDeploy(params: {
+    appPath: string;
+    gasAddress?: string;
+    gasBudget?: number;
+  }): Promise<{
+    success: boolean;
+    packageId?: string;
+    transactionDigest?: string;
+    output: string;
+    error?: string;
+  }> {
+    return this.ipcRenderer.invoke("sui-deploy", params);
+  }
+
+  public async getSuiAddress(): Promise<{ address: string | null }> {
+    return this.ipcRenderer.invoke("sui-get-address");
   }
 }
