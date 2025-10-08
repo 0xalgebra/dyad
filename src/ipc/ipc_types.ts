@@ -115,6 +115,7 @@ export interface App {
   installCommand: string | null;
   startCommand: string | null;
   isFavorite: boolean;
+  isContractProject?: boolean | null;
 }
 
 export interface Version {
@@ -484,8 +485,7 @@ export interface McpServer {
   updatedAt: number;
 }
 
-export interface CreateMcpServer
-  extends Omit<McpServer, "id" | "createdAt" | "updatedAt"> {}
+export type CreateMcpServer = Omit<McpServer, "id" | "createdAt" | "updatedAt">
 export type McpServerUpdate = Partial<McpServer> & Pick<McpServer, "id">;
 export type McpToolConsentType = "ask" | "always" | "denied";
 
