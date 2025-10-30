@@ -1333,13 +1333,13 @@ export class IpcClient {
     success: boolean;
     output: string;
     error?: string;
+    fullError?: string;
   }> {
     return this.ipcRenderer.invoke("sui-compile", { appPath });
   }
 
   public async suiDeploy(params: {
     appPath: string;
-    gasAddress?: string;
     gasBudget?: number;
   }): Promise<{
     success: boolean;
@@ -1353,5 +1353,9 @@ export class IpcClient {
 
   public async getSuiAddress(): Promise<{ address: string | null }> {
     return this.ipcRenderer.invoke("sui-get-address");
+  }
+
+  public async getSuiBalance(): Promise<{ balance: string | null; formattedBalance: string | null }> {
+    return this.ipcRenderer.invoke("sui-get-balance");
   }
 }
