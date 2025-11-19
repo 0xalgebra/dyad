@@ -138,6 +138,7 @@ const validInvokeChannels = [
   // Sui
   "sui-compile",
   "sui-deploy",
+  "sui-test",
   "sui-get-address",
   "sui-get-balance",
   // Test-only channels
