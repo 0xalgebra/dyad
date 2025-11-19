@@ -27,14 +27,30 @@ import { useSettings } from "@/hooks/useSettings";
 import { PriceBadge } from "@/components/PriceBadge";
 import { TURBO_MODELS } from "@/ipc/shared/language_model_constants";
 import { cn } from "@/lib/utils";
+import { useAtomValue } from "jotai";
+import { selectedAppIdAtom, appsListAtom } from "@/atoms/appAtoms";
 
 export function ModelPicker() {
   const { settings, updateSettings } = useSettings();
-  const onModelSelect = (model: LargeLanguageModel) => {
-    updateSettings({ selectedModel: model });
-  };
 
   const [open, setOpen] = useState(false);
+
+  // Check if current app is a contract project
+  const selectedAppId = useAtomValue(selectedAppIdAtom);
+  const apps = useAtomValue(appsListAtom);
+  const selectedApp = apps.find((app) => app.id === selectedAppId);
+  const isContractProject = selectedApp?.isContractProject ?? false;
+
+  // Update the appropriate model based on project type
+  const onModelSelect = (model: LargeLanguageModel) => {
+    if (isContractProject) {
+      // For contract projects, update translateModel
+      updateSettings({ translateModel: model });
+    } else {
+      // For regular projects, update selectedModel
+      updateSettings({ selectedModel: model });
+    }
+  };
 
   // Cloud models from providers
   const { data: modelsByProviders, isLoading: modelsByProvidersLoading } =
@@ -68,8 +84,27 @@ export function ModelPicker() {
     }
   }, [open, loadOllamaModels, loadLMStudioModels]);
 
+  // Get the actual model that will be used (considering contract projects)
+  const getActualModel = (): LargeLanguageModel => {
+    if (isContractProject) {
+      const translateModel = settings?.translateModel;
+      // For contract projects, use translateModel if explicitly set to a non-auto model
+      // Otherwise default to SolMover
+      if (translateModel && translateModel.provider !== "auto") {
+        return translateModel;
+      }
+      // Default to SolMover for contract translation
+      return {
+        provider: "solmover",
+        name: "solmover",
+      };
+    }
+    return selectedModel;
+  };
+
   // Get display name for the selected model
   const getModelDisplayName = () => {
+    
     if (selectedModel.provider === "ollama") {
       return (
         ollamaModels.find(
@@ -106,6 +141,28 @@ export function ModelPicker() {
     return selectedModel.name;
   };
 
+  // Get display name for the actual model being used
+  const getActualModelDisplayName = () => {
+    const actualModel = getActualModel();
+
+    // For SolMover
+    if (actualModel.provider === "solmover") {
+      return "SolMover";
+    }
+
+    // For other providers, look up in modelsByProviders
+    if (modelsByProviders && modelsByProviders[actualModel.provider]) {
+      const foundModel = modelsByProviders[actualModel.provider].find(
+        (model) => model.apiName === actualModel.name,
+      );
+      if (foundModel) {
+        return foundModel.displayName;
+      }
+    }
+
+    return actualModel.name;
+  };
+
   // Get auto provider models (if any)
   const autoModels =
     !loading && modelsByProviders && modelsByProviders["auto"]
@@ -139,6 +196,8 @@ export function ModelPicker() {
   }
   const selectedModel = settings?.selectedModel;
   const modelDisplayName = getModelDisplayName();
+  const actualModelDisplayName = getActualModelDisplayName();
+  const isUsingDifferentModel = isContractProject && actualModelDisplayName !== modelDisplayName;
   // Split providers into primary and secondary groups (excluding auto)
   const providerEntries =
     !loading && modelsByProviders
@@ -168,22 +227,44 @@ export function ModelPicker() {
             <Button
               variant="outline"
               size="sm"
-              className="flex items-center gap-2 h-8 max-w-[130px] px-1.5 text-xs-sm"
+              className={cn(
+                "flex items-center gap-2 h-8 max-w-[160px] px-1.5 text-xs-sm",
+                isUsingDifferentModel && "border-purple-500/50"
+              )}
             >
               <span className="truncate">
-                {modelDisplayName === "Auto" && (
+                {isUsingDifferentModel ? (
+                  <>
+                    <span className="text-xs text-muted-foreground">Using:</span>{" "}
+                    <span className="text-purple-600 dark:text-purple-400">{actualModelDisplayName}</span>
+                  </>
+                ) : modelDisplayName === "Auto" ? (
                   <>
                     <span className="text-xs text-muted-foreground">
                       Model:
                     </span>{" "}
+                    {modelDisplayName}
                   </>
+                ) : (
+                  modelDisplayName
                 )}
-                {modelDisplayName}
               </span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent>{modelDisplayName}</TooltipContent>
+        <TooltipContent>
+          {isUsingDifferentModel ? (
+            <div className="text-sm">
+              <p><strong>Contract Project</strong></p>
+              <p>Using: {actualModelDisplayName}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                (Default: {actualModelDisplayName})
+              </p>
+            </div>
+          ) : (
+            modelDisplayName
+          )}
+        </TooltipContent>
       </Tooltip>
       <DropdownMenuContent
         className="w-64"

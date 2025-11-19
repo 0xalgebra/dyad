@@ -219,6 +219,7 @@ export type ZoomLevel = z.infer<typeof ZoomLevelSchema>;
  */
 export const UserSettingsSchema = z.object({
   selectedModel: LargeLanguageModelSchema,
+  translateModel: LargeLanguageModelSchema.optional(), // Model for contract translation (defaults to SolMover)
   providerSettings: z.record(z.string(), ProviderSettingSchema),
   githubUser: GithubUserSchema.optional(),
   githubAccessToken: SecretSchema.optional(),
