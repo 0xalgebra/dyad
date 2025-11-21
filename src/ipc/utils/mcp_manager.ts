@@ -1,8 +1,8 @@
 import { db } from "../../db";
 import { mcpServers } from "../../db/schema";
-import { experimental_createMCPClient, experimental_MCPClient } from "ai";
 import { eq } from "drizzle-orm";
 
+import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
@@ -13,9 +13,9 @@ class McpManager {
     return this._instance;
   }
 
-  private clients = new Map<number, experimental_MCPClient>();
+  private clients = new Map<number, Client>();
 
-  async getClient(serverId: number): Promise<experimental_MCPClient> {
+  async getClient(serverId: number): Promise<Client> {
     const existing = this.clients.get(serverId);
     if (existing) return existing;
     const server = await db
@@ -40,9 +40,16 @@ class McpManager {
     } else {
       throw new Error(`Unsupported MCP transport: ${s.transport}`);
     }
-    const client = await experimental_createMCPClient({
-      transport,
-    });
+    const client = new Client(
+      {
+        name: "dyad-mcp-client",
+        version: "1.0.0",
+      },
+      {
+        capabilities: {},
+      }
+    );
+    await client.connect(transport);
     this.clients.set(serverId, client);
     return client;
   }
