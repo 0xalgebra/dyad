@@ -134,6 +134,13 @@
       "when": 1763643357599,
       "tag": "0018_add_is_contract_project",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1763729249990,
+      "tag": "0017_nifty_hammerhead",
+      "breakpoints": true
     }
   ]
 }

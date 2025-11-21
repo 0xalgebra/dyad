@@ -1345,6 +1345,11 @@ export class IpcClient {
     success: boolean;
     packageId?: string;
     transactionDigest?: string;
+    createdObjects?: Array<{
+      objectId: string;
+      objectType: string;
+      owner?: string;
+    }>;
     output: string;
     error?: string;
   }> {
@@ -1368,5 +1373,15 @@ export class IpcClient {
     formattedBalance: string | null;
   }> {
     return this.ipcRenderer.invoke("sui-get-balance");
+  }
+
+  public async saveContractDeployment(params: {
+    appId: number;
+    chain: string;
+    address: string;
+    network: string;
+    deploymentData?: Record<string, any>;
+  }): Promise<{ success: boolean; error?: string }> {
+    return this.ipcRenderer.invoke("save-contract-deployment", params);
   }
 }
