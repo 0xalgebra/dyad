@@ -96,8 +96,8 @@ export async function getModelClient(
               enableLazyEdits:
                 settings.selectedChatMode === "ask"
                   ? false
-                  : settings.enableProLazyEditsMode  &&
-                  settings.proLazyEditsMode !== "v2",
+                  : settings.enableProLazyEditsMode &&
+                    settings.proLazyEditsMode !== "v2",
               enableSmartFilesContext,
               // Keep in sync with getCurrentValue in ProModeSelector.tsx
               smartContextMode: settings.proSmartContextOption ?? "balanced",
@@ -412,10 +412,11 @@ function getRegularModelClient(
       // Ollama exposes OpenAI-compatible API at /v1/chat/completions
       const provider = createOpenAICompatible({
         name: "solmover",
-        baseURL: "https://3de3ed54-8b53-47d3-8ad3-2d8bb0befb9a.app.gra.ai.cloud.ovh.net/v1",
+        baseURL:
+          "https://3de3ed54-8b53-47d3-8ad3-2d8bb0befb9a.app.gra.ai.cloud.ovh.net/v1",
         apiKey: apiKey,
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
       });
       return {
