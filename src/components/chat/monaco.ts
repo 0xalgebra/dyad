@@ -34,6 +34,11 @@ self.MonacoEnvironment = {
 
 loader.config({ monaco });
 
+// Initialize blockchain language support (Solidity, Move, etc.)
+import("@/utils/blockchain_languages").then(({ initializeBlockchainLanguages }) => {
+  initializeBlockchainLanguages().catch(console.error);
+});
+
 // loader.init().then(/* ... */);
 export const customLight: editor.IStandaloneThemeData = {
   base: "vs",
@@ -88,6 +93,28 @@ export const customLight: editor.IStandaloneThemeData = {
     { token: "keyword.json", foreground: "0451A5" },
     { token: "keyword.flow", foreground: "AF00DB" },
     { token: "keyword.flow.scss", foreground: "0000FF" },
+    { token: "keyword.control", foreground: "0000FF" },
+    { token: "keyword.other", foreground: "0000FF" },
+
+    { token: "storage", foreground: "0000FF" },
+    { token: "storage.type", foreground: "0000FF" },
+    { token: "storage.modifier", foreground: "0000FF" },
+
+    { token: "entity.name.function", foreground: "795E26" },
+    { token: "entity.name.type", foreground: "267F99" },
+    { token: "entity.name.class", foreground: "267F99" },
+    { token: "entity.other.inherited-class", foreground: "267F99" },
+
+    { token: "support.type", foreground: "267F99" },
+    { token: "support.function", foreground: "795E26" },
+    { token: "support.constant", foreground: "dd0000" },
+
+    { token: "variable.parameter", foreground: "001188" },
+    { token: "variable.other", foreground: "001188" },
+
+    // TOML-specific tokens
+    { token: "entity.name.section", foreground: "0000FF", fontStyle: "bold" },
+    { token: "key", foreground: "863B00" },
 
     { token: "operator.scss", foreground: "666666" },
     { token: "operator.sql", foreground: "778899" },
@@ -160,6 +187,28 @@ export const customDark: editor.IStandaloneThemeData = {
     { token: "keyword.flow", foreground: "C586C0" },
     { token: "keyword.json", foreground: "CE9178" },
     { token: "keyword.flow.scss", foreground: "569CD6" },
+    { token: "keyword.control", foreground: "C586C0" },
+    { token: "keyword.other", foreground: "569CD6" },
+
+    { token: "storage", foreground: "569CD6" },
+    { token: "storage.type", foreground: "569CD6" },
+    { token: "storage.modifier", foreground: "569CD6" },
+
+    { token: "entity.name.function", foreground: "DCDCAA" },
+    { token: "entity.name.type", foreground: "4EC9B0" },
+    { token: "entity.name.class", foreground: "4EC9B0" },
+    { token: "entity.other.inherited-class", foreground: "4EC9B0" },
+
+    { token: "support.type", foreground: "4EC9B0" },
+    { token: "support.function", foreground: "DCDCAA" },
+    { token: "support.constant", foreground: "569CD6" },
+
+    { token: "variable.parameter", foreground: "9CDCFE" },
+    { token: "variable.other", foreground: "9CDCFE" },
+
+    // TOML-specific tokens
+    { token: "entity.name.section", foreground: "4EC9B0", fontStyle: "bold" },
+    { token: "key", foreground: "9CDCFE" },
 
     { token: "operator.scss", foreground: "909090" },
     { token: "operator.sql", foreground: "778899" },
