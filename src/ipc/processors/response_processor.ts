@@ -502,17 +502,43 @@ export async function processFullResponseActions(
 
       // Check for any uncommitted changes after the commit
       const statusMatrix = await git.statusMatrix({ fs, dir: appPath });
-      uncommittedFiles = statusMatrix
+      const allUncommittedFiles = statusMatrix
         .filter((row) => row[1] !== 1 || row[2] !== 1 || row[3] !== 1)
         .map((row) => row[0]); // Get just the file paths
 
+      // Filter out build artifacts that should not be auto-committed
+      const isBuildArtifact = (filepath: string): boolean => {
+        const buildArtifactPatterns = [
+          /\/target\//,                    // Rust/Cargo build directory
+          /\/Cargo\.lock$/,                // Cargo lock files in subdirectories
+          /\/\.rustc_info\.json$/,         // Rust compiler info
+          /\/CACHEDIR\.TAG$/,              // Cache directory marker
+          /\/\.fingerprint\//,             // Cargo fingerprint cache
+          /\/build\//,                     // General build directories
+          /\/\.anchor\//,                  // Anchor framework cache
+          /\/node_modules\//,              // Node modules
+          /\/\.next\//,                    // Next.js build
+          /\/dist\//,                      // Build output
+          /\/out\//,                       // Build output
+        ];
+
+        return buildArtifactPatterns.some((pattern) => pattern.test(filepath));
+      };
+
+      uncommittedFiles = allUncommittedFiles.filter(
+        (file) => !isBuildArtifact(file)
+      );
+
       if (uncommittedFiles.length > 0) {
-        // Stage all changes
-        await git.add({
-          fs,
-          dir: appPath,
-          filepath: ".",
-        });
+        // Only stage the non-build-artifact files
+        for (const file of uncommittedFiles) {
+          await git.add({
+            fs,
+            dir: appPath,
+            filepath: file,
+          });
+        }
+
         try {
           commitHash = await gitCommit({
             path: appPath,
