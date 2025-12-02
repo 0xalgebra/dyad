@@ -1328,6 +1328,21 @@ export class IpcClient {
     this.ipcRenderer.invoke("help:chat:cancel", sessionId).catch(() => {});
   }
 
+  // Sui Version
+  public async suiVersion(): Promise<{
+    suiVersion: string | null;
+  }> {
+    return this.ipcRenderer.invoke("sui-version");
+  }
+
+  // Sui Install CLI
+  public async suiInstall(): Promise<{
+    success: boolean;
+    output: string;
+  }> {
+    return this.ipcRenderer.invoke("sui-install");
+  }
+
   // Sui Move compilation and deployment
   public async suiCompile(appPath: string): Promise<{
     success: boolean;

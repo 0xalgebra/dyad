@@ -1,7 +1,7 @@
 import { FileEditor } from "./FileEditor";
 import { FileTree } from "./FileTree";
 import { SuiSetup } from "./SuiSetup";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { selectedFileAtom } from "@/atoms/viewAtoms";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
@@ -24,6 +24,7 @@ import { useLoadApp } from "@/hooks/useLoadApp";
 import { IpcClient } from "@/ipc/ipc_client";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { useNavigate } from "@tanstack/react-router";
+import { InstallDialog } from "./InstallDialog";
 
 interface App {
   id?: number;
@@ -65,6 +66,23 @@ export const ContractView = ({ loading, app }: ContractViewProps) => {
   const [deployedPackageId, setDeployedPackageId] = useState<string | null>(
     null,
   );
+  const [cliInstalled, setCliInstalled] = useState<boolean | null>(null);
+  const [isInstallDialogOpen, setIsInstallDialogOpen] = useState(false);
+
+  const checkSuiVersion = useCallback(async () => {
+    try {
+      const result = await IpcClient.getInstance().suiVersion();
+      setCliInstalled(!!result.suiVersion);
+      console.log("Sui CLI version:", result.suiVersion);
+    } catch (error) {
+      console.error("Failed to check Sui version:", error);
+    }
+  }, []);
+
+  // Check if Sui CLI is installed on mount
+  useEffect(() => {
+    checkSuiVersion();
+  }, []);
 
   // Get Sui address on mount
   useEffect(() => {
@@ -94,6 +112,10 @@ export const ContractView = ({ loading, app }: ContractViewProps) => {
 
   const handleCompile = async () => {
     if (!app?.path) return;
+    if (!cliInstalled) {
+      setIsInstallDialogOpen(true);
+      return;
+    }
 
     setCompileStatus("compiling");
     setCompileOutput("");
@@ -174,6 +196,11 @@ Make only the code changes and give no further tips and actions, only a brief su
 
   const handleDeploy = async () => {
     if (!app?.path || compileStatus !== "success") return;
+
+    if (!cliInstalled) {
+      setIsInstallDialogOpen(true);
+      return;
+    }
 
     setDeployStatus("deploying");
     setDeployOutput("");
@@ -509,6 +536,11 @@ Make only the code changes and give no further tips and actions, only a brief su
           </p>
         </div>
       )}
+      <InstallDialog
+        isOpen={isInstallDialogOpen}
+        onClose={() => setIsInstallDialogOpen(false)}
+        onSuccess={checkSuiVersion}
+      />
     </div>
   );
 };

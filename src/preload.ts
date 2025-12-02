@@ -136,6 +136,8 @@ const validInvokeChannels = [
   "github:clone-repo-from-url",
   "get-latest-security-review",
   // Sui
+  "sui-version",
+  "sui-install",
   "sui-compile",
   "sui-deploy",
   "sui-test",
@@ -166,6 +168,7 @@ const validReceiveChannels = [
   "help:chat:response:error",
   // MCP consent request from main to renderer
   "mcp:tool-consent-request",
+  "sui:install:response"
 ] as const;
 
 type ValidInvokeChannel = (typeof validInvokeChannels)[number];

@@ -1,15 +1,148 @@
 import { spawn } from "child_process";
 import path from "path";
-import fs from "fs";
+import * as fs from "fs";
 import log from "electron-log";
 import { createLoggedHandler } from "./safe_handle";
 import { getDyadAppPath } from "../../paths/paths";
 import { db } from "../../db";
 import { apps } from "../../db/schema";
 import { eq } from "drizzle-orm";
+import { runShellCommand } from "../utils/runShellCommand";
+import * as os from "os";
+import * as https from "https";
+import { safeSend } from "../utils/safe_sender";
 
 const logger = log.scope("sui_handlers");
 const handle = createLoggedHandler(logger);
+const PLATFORM = os.platform();
+const ARCH = os.arch();
+const SHINSO_DIR = path.join(os.homedir(), ".shinso");
+const BIN_DIR = path.join(SHINSO_DIR, "bin");
+const SUI_BINARY_NAME = PLATFORM === "win32" ? "sui.exe" : "sui";
+const SUI_BINARY_PATH = path.join(BIN_DIR, SUI_BINARY_NAME);
+
+const SUI_VERSION = "testnet-v1.55.0";
+const getSuiDownloadUrl = (): string => {
+  if (PLATFORM === "darwin") {
+    // macOS
+    if (ARCH === "arm64") {
+      return `https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-macos-arm64.tgz`;
+    } else {
+      return `https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-macos-x86_64.tgz`;
+    }
+  } else if (PLATFORM === "win32") {
+    return `https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-windows-x86_64.tgz`;
+  } else {
+    // Linux
+    if (ARCH === "arm64") {
+      return `https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-arm64.tgz`;
+    } else {
+      return `https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz`;
+    }
+  }
+};
+
+const SUI_DOWNLOAD_URL =
+  "https://github.com/MystenLabs/sui/releases/download/testnet-v1.55.0/sui-testnet-v1.55.0-ubuntu-x86_64.tgz";
+
+/**
+ * Format bytes to ["B", "KB", "MB", "GB"]
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+/**
+ * Format percent into progress bar
+ */
+function formatProgressBar(percent: number, width = 40): string {
+  const filled = Math.round((percent / 100) * width);
+  const empty = width - filled;
+  const bar = "█".repeat(filled) + "░".repeat(empty);
+  return `[${bar}]`;
+}
+
+function downloadFile(
+  url: string,
+  destPath: string,
+  onProgress: (downloaded: number, total: number, speed: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const makeRequest = (requestUrl: string) => {
+      https
+        .get(requestUrl, (response) => {
+          if (response.statusCode === 302 || response.statusCode === 301) {
+            const redirectUrl = response.headers.location;
+            if (redirectUrl) {
+              makeRequest(redirectUrl);
+              return;
+            }
+          }
+
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(
+                `HTTP ${response.statusCode}: ${response.statusMessage}`,
+              ),
+            );
+            return;
+          }
+
+          const totalSize = parseInt(
+            response.headers["content-length"] || "0",
+            10,
+          );
+          let downloadedSize = 0;
+          let lastReportedSize = 0;
+          let lastReportTime = Date.now();
+
+          const file = fs.createWriteStream(destPath);
+
+          response.on("data", (chunk) => {
+            downloadedSize += chunk.length;
+            const now = Date.now();
+            const timeDiff = (now - lastReportTime) / 1000; // seconds
+
+            // Report progress every 0.5 seconds or every 5MB
+            if (
+              timeDiff >= 0.5 ||
+              downloadedSize - lastReportedSize >= 5 * 1024 * 1024
+            ) {
+              const speed = (downloadedSize - lastReportedSize) / timeDiff; // bytes per second
+              onProgress(downloadedSize, totalSize, speed);
+              lastReportedSize = downloadedSize;
+              lastReportTime = now;
+            }
+          });
+
+          response.pipe(file);
+
+          file.on("finish", () => {
+            file.close();
+            onProgress(downloadedSize, totalSize, 0);
+            resolve();
+          });
+
+          file.on("error", (err) => {
+            fs.unlink(destPath, (err) => {
+              if (err) throw err;
+              console.log(`${destPath} was deleted`);
+            });
+            reject(err);
+          });
+        })
+        .on("error", (err) => {
+          reject(err);
+        });
+    };
+
+    makeRequest(url);
+  });
+}
 
 /**
  * Strip ANSI color codes from string
@@ -265,6 +398,15 @@ function formatCompilerErrors(rawOutput: string, truncate = true): string {
   return output.trim();
 }
 
+export interface SuiVersionResult {
+  suiVersion: string | null;
+}
+
+export interface SuiInstallResult {
+  success: boolean;
+  output: string;
+}
+
 export interface SuiCompileParams {
   appPath: string;
 }
@@ -413,6 +555,151 @@ export function registerSuiHandlers() {
   }
 
   /**
+   * Check Sui CLI version
+   */
+  handle("sui-version", async (): Promise<SuiVersionResult> => {
+    logger.info("IPC: sui-version called");
+    let suiVersion: string | null = null;
+    try {
+      suiVersion = await runShellCommand(`${SUI_BINARY_PATH} --version`);
+    } catch (err) {
+      console.error("Failed to get SUI CLI version:", err);
+    }
+    return {
+      suiVersion,
+    };
+  });
+
+  /**
+   * Install SUI CLI
+   */
+  handle("sui-install", async (event): Promise<SuiInstallResult> => {
+    const outputLines: string[] = [];
+
+    const sendOutput = (line: string, inProgress = false) => {
+      safeSend(event.sender, "sui:install:response", {
+        line,
+        inProgress,
+      });
+    };
+
+    try {
+      sendOutput(
+        `====================================================
+                  Sui CLI Installation Script v1.0.0
+        =====================================================`,
+      );
+      sendOutput("");
+      sendOutput("--- Step 1/6: Creating installation directory");
+      sendOutput(`$ mkdir -p ~/.shinso/bin/`);
+      await runShellCommand(`mkdir -p ${BIN_DIR}`);
+      sendOutput(`✓ Created: ${BIN_DIR}`);
+      sendOutput("");
+      sendOutput("--- Step 2/6: Preparing temporary directory");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sui-install-"));
+      sendOutput(`$ mkdir -p ${tmpDir}`);
+      await runShellCommand(`mkdir -p ${tmpDir}`);
+      sendOutput(`✓ Created: ${tmpDir}`);
+      sendOutput("");
+      sendOutput("--- Step 3/6: Downloading Sui CLI");
+      sendOutput(`$ wget ${SUI_DOWNLOAD_URL}`);
+      sendOutput(`Destination: ${tmpDir}/sui.tgz`);
+      const tarballPath = path.join(tmpDir, "sui.tgz");
+      let lastUpdateTime = Date.now();
+      await downloadFile(
+        getSuiDownloadUrl(),
+        tarballPath,
+        (downloaded, total, speed) => {
+          const now = Date.now();
+          if (now - lastUpdateTime < 200 && downloaded !== total) return;
+          lastUpdateTime = now;
+
+          const percent = ((downloaded / total) * 100).toFixed(1);
+          const downloadedStr = formatBytes(downloaded);
+          const totalStr = formatBytes(total);
+          const speedStr =
+            speed > 0 ? `${formatBytes(speed)}/s` : "calculating...";
+          const progressBar = formatProgressBar(parseFloat(percent));
+
+          const progressLine = `${progressBar} ${percent.padStart(5)}% | ${downloadedStr} / ${totalStr} | ${speedStr}`;
+          sendOutput(progressLine, true);
+        },
+      );
+
+      const fileSize = fs.statSync(tarballPath).size;
+      sendOutput(`✓ Download complete: ${formatBytes(fileSize)}`);
+      sendOutput("");
+
+      sendOutput("--- Step 4/6: Extracting...");
+      sendOutput(`$ tar -xzf sui.tgz -C ${tmpDir}`);
+      await runShellCommand(`tar -xzf ${tmpDir}/sui.tgz -C ${tmpDir}`);
+      sendOutput("✓ Extraction complete");
+      sendOutput("");
+
+      sendOutput("--- Step 5/6: Installing sui binary");
+      sendOutput(`$ cp ${tmpDir}/sui ${SUI_BINARY_PATH}`);
+      await runShellCommand(`cp ${tmpDir}/sui ${SUI_BINARY_PATH}`);
+      if (PLATFORM !== "win32") {
+        sendOutput(`$ chmod +x ${SUI_BINARY_PATH}`);
+        await runShellCommand(`chmod +x ${SUI_BINARY_PATH}`);
+      }
+
+      sendOutput("");
+
+      sendOutput("--- Step 6/6: Verifying installation");
+      sendOutput(`$ ${SUI_BINARY_PATH} --version`);
+      let suiVersion: string | null = null;
+      try {
+        suiVersion = await runShellCommand(`${SUI_BINARY_PATH} --version`);
+      } catch (err) {
+        console.error("Failed to get SUI CLI version:", err);
+      }
+      if (suiVersion) {
+        sendOutput(`SUI CLI version: ${suiVersion}`);
+      } else {
+        sendOutput("Note: The binary was installed but verification failed");
+      }
+      sendOutput("");
+
+      sendOutput("--- Cleanup: Removing temporary files");
+      sendOutput(`$ rm -rf ${tmpDir}`);
+      await runShellCommand(`rm -rf ${tmpDir}`);
+      sendOutput("");
+
+      sendOutput(
+        `==================================================
+                  ✓ Installation Successful!
+        ===================================================`,
+      );
+      sendOutput("");
+      sendOutput(`Sui CLI installed at: ${SUI_BINARY_PATH}`);
+      sendOutput("You can now use Sui CLI for deployment.");
+
+      return {
+        success: true,
+        output: outputLines.join("\n"),
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      sendOutput("");
+      sendOutput(
+        `=====================================================
+                  ✗ Installation Failed
+        ======================================================`,
+      );
+      sendOutput("");
+      sendOutput(`Error: ${errorMsg}`);
+      sendOutput("");
+      sendOutput("Please check the error message above and try again.");
+
+      return {
+        success: false,
+        output: outputLines.join("\n"),
+      };
+    }
+  });
+
+  /**
    * Compile a Move package using sui move build
    */
   handle(
@@ -462,7 +749,7 @@ export function registerSuiHandlers() {
         let stderr = "";
 
         const suiProcess = spawn(
-          "sui",
+          SUI_BINARY_PATH,
           ["move", "build", "--dump-bytecode-as-base64"],
           {
             cwd: movePath,
@@ -752,7 +1039,7 @@ export function registerSuiHandlers() {
         let stdout = "";
         let stderr = "";
 
-        const suiProcess = spawn("sui", ["move", "test"], {
+        const suiProcess = spawn(SUI_BINARY_PATH, ["move", "test"], {
           cwd: movePath,
           shell: true,
         });
@@ -949,7 +1236,9 @@ export function registerSuiHandlers() {
           })
           .where(eq(apps.id, appId));
 
-        logger.info(`Saved deployment info for app ${appId}: ${chain} - ${address}`);
+        logger.info(
+          `Saved deployment info for app ${appId}: ${chain} - ${address}`,
+        );
 
         return { success: true };
       } catch (error) {
