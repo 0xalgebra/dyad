@@ -33,6 +33,7 @@ import { registerHelpBotHandlers } from "./handlers/help_bot_handlers";
 import { registerMcpHandlers } from "./handlers/mcp_handlers";
 import { registerSecurityHandlers } from "./handlers/security_handlers";
 import { registerSuiHandlers } from "./handlers/sui_handlers";
+import { registerSolanaHandlers } from "./handlers/solana_handlers";
 
 export function registerIpcHandlers() {
   // Register all IPC handlers by category
@@ -71,4 +72,5 @@ export function registerIpcHandlers() {
   registerMcpHandlers();
   registerSecurityHandlers();
   registerSuiHandlers();
+  registerSolanaHandlers();
 }
